@@ -23,16 +23,16 @@ class CallActivity : Activity(), TextToSpeech.OnInitListener {
         tts = TextToSpeech(this, this)
 
         val root = column()
-        root.addView(label("الرقم الحالي", 22f, true, true), wrapParams())
-        numberView = label("-", 110f, true, true)
-        typeView = label("", 30f, true, true)
+        root.addView(header("الرقم الحالي"), wrapParams())
+        numberView = label("-", 110f, true, true).apply { setTextColor(C.DARK) }
+        typeView = label("", 30f, true, true).apply { setTextColor(C.GREEN) }
         waitingView = label("", 20f, false, true)
         root.addView(numberView, inColumn(1f))
         root.addView(typeView, wrapParams())
         root.addView(waitingView, wrapParams())
 
         val r1 = row()
-        r1.addView(button("التالي", 26f) { next() }, inRow(1f, 200))
+        r1.addView(button("التالي", 26f, C.GREEN) { next() }, inRow(1f, dp(80)))
         root.addView(r1, wrapParams())
 
         val r2 = row()
@@ -40,7 +40,7 @@ class CallActivity : Activity(), TextToSpeech.OnInitListener {
         r2.addView(button("تخطي", 20f) { skip() }, inRow())
         root.addView(r2, wrapParams())
 
-        root.addView(button("رجوع", 18f) { finish() }, wrapParams())
+        root.addView(button("رجوع", 18f, C.GRAY) { finish() }, wrapParams())
         setContentView(root)
         refresh()
     }

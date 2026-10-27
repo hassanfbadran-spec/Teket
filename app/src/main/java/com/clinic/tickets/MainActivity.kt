@@ -3,7 +3,7 @@ package com.clinic.tickets
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import android.widget.LinearLayout
+import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 
@@ -22,20 +22,23 @@ class MainActivity : Activity() {
         printer.connect()
 
         val root = column()
-        title = label("", 28f, true, true)
-        status = label("", 16f, false, true)
+        title = header("")
+        status = label("", 15f, false, true)
         root.addView(title, wrapParams())
         root.addView(status, wrapParams())
 
         val big = row()
-        big.addView(button(Types.EXAM, 34f) { issue(Types.EXAM) }, inRow(1f, LinearLayout.LayoutParams.MATCH_PARENT))
-        big.addView(button(Types.REVIEW, 34f) { issue(Types.REVIEW) }, inRow(1f, LinearLayout.LayoutParams.MATCH_PARENT))
-        root.addView(big, inColumn(1f))
+        val h = dp(100)
+        big.addView(button(Types.EXAM, 30f, C.PRIMARY) { issue(Types.EXAM) }, inRow(1f, h))
+        big.addView(button(Types.REVIEW, 30f, C.GREEN) { issue(Types.REVIEW) }, inRow(1f, h))
+        root.addView(big, wrapParams())
+
+        root.addView(View(this), inColumn(1f))
 
         val bottom = row()
         bottom.addView(button("الاستدعاء", 18f) { startActivity(Intent(this, CallActivity::class.java)) }, inRow())
         bottom.addView(button("السجل", 18f) { startActivity(Intent(this, LogActivity::class.java)) }, inRow())
-        bottom.addView(button("الإعدادات", 18f) { startActivity(Intent(this, SettingsActivity::class.java)) }, inRow())
+        bottom.addView(button("الإعدادات", 18f, C.GRAY) { startActivity(Intent(this, SettingsActivity::class.java)) }, inRow())
         root.addView(bottom, wrapParams())
 
         setContentView(root)
@@ -55,8 +58,7 @@ class MainActivity : Activity() {
 
     private fun refresh() {
         title.text = Settings.clinic(this)
-        val p = if (printer.isReady()) "متصلة" else "غير متصلة"
-        status.text = "المنتظرون: ${db.waitingTotal()}   |   آخر رقم: ${db.lastNumber()}   |   الطابعة: $p"
+        status.text = "المنتظرون: ${db.waitingTotal()}   |   آخر رقم: ${db.lastNumber()}   |   الطابعة: ${printer.statusText()}"
     }
 
     private fun issue(type: String) {
@@ -68,12 +70,14 @@ class MainActivity : Activity() {
             return
         }
         val (ticket, ahead) = db.issue(type)
-        val ok = printer.printTicket(
-            Settings.clinic(this), Settings.doctor(this), Settings.footer(this), ticket, ahead
-        )
-        if (!ok) {
-            Toast.makeText(this, "تعذرت الطباعة للتذكرة رقم ${ticket.number}", Toast.LENGTH_LONG).show()
+        val extras = listOf(1, 2, 3).map { Settings.line(this, it) }.filter { it.isNotBlank() }
+        printer.printTicket(
+            Settings.clinic(this), Settings.doctor(this), Settings.footer(this), extras, ticket, ahead
+        ) { ok ->
+            if (!ok) {
+                Toast.makeText(this, "تعذرت الطباعة للتذكرة رقم ${ticket.number}", Toast.LENGTH_LONG).show()
+            }
+            refresh()
         }
-        refresh()
     }
 }

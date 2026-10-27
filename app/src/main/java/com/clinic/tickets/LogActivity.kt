@@ -2,6 +2,7 @@ package com.clinic.tickets
 
 import android.app.Activity
 import android.os.Bundle
+import android.widget.Button
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -20,6 +21,9 @@ class LogActivity : Activity() {
     private val cal = Calendar.getInstance()
     private var lines: List<String> = emptyList()
     private var title = ""
+    private lateinit var bDay: Button
+    private lateinit var bMonth: Button
+    private lateinit var bYear: Button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,16 +32,20 @@ class LogActivity : Activity() {
         printer.connect()
 
         val root = column()
+        root.addView(header("السجل"), wrapParams())
 
         val modes = row()
-        modes.addView(button("يومي", 18f) { mode = 0; render() }, inRow())
-        modes.addView(button("شهري", 18f) { mode = 1; render() }, inRow())
-        modes.addView(button("سنوي", 18f) { mode = 2; render() }, inRow())
+        bDay = button("يومي", 18f) { mode = 0; render() }
+        bMonth = button("شهري", 18f) { mode = 1; render() }
+        bYear = button("سنوي", 18f) { mode = 2; render() }
+        modes.addView(bDay, inRow())
+        modes.addView(bMonth, inRow())
+        modes.addView(bYear, inRow())
         root.addView(modes, wrapParams())
 
         val nav = row()
         nav.addView(button("السابق", 16f) { shift(-1) }, inRow())
-        period = label("", 20f, true, true)
+        period = label("", 20f, true, true).apply { setTextColor(C.DARK) }
         nav.addView(period, inRow(2f))
         nav.addView(button("التالي", 16f) { shift(1) }, inRow())
         root.addView(nav, wrapParams())
@@ -49,7 +57,7 @@ class LogActivity : Activity() {
 
         val bottom = row()
         bottom.addView(button("طباعة ملخص", 18f) { printSummary() }, inRow())
-        bottom.addView(button("رجوع", 18f) { finish() }, inRow())
+        bottom.addView(button("رجوع", 18f, C.GRAY) { finish() }, inRow())
         root.addView(bottom, wrapParams())
 
         setContentView(root)
@@ -90,6 +98,9 @@ class LogActivity : Activity() {
     private fun render() {
         val prefix = fmt().format(cal.time)
         val modeName = listOf("يومي", "شهري", "سنوي")[mode]
+        bDay.fillColor(if (mode == 0) C.DARK else C.MUTED)
+        bMonth.fillColor(if (mode == 1) C.DARK else C.MUTED)
+        bYear.fillColor(if (mode == 2) C.DARK else C.MUTED)
         period.text = "$modeName: $prefix"
         title = "سجل $modeName $prefix"
 
@@ -120,7 +131,8 @@ class LogActivity : Activity() {
             Toast.makeText(this, "الطابعة غير متصلة", Toast.LENGTH_LONG).show()
             return
         }
-        val ok = printer.printSummary(Settings.clinic(this), title, lines)
-        if (!ok) Toast.makeText(this, "تعذرت الطباعة", Toast.LENGTH_LONG).show()
+        printer.printSummary(Settings.clinic(this), title, lines) { ok ->
+            if (!ok) Toast.makeText(this, "تعذرت الطباعة", Toast.LENGTH_LONG).show()
+        }
     }
 }
