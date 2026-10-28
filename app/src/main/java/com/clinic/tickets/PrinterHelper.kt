@@ -205,15 +205,16 @@ class PrinterHelper(private val ctx: Context) {
                 var socket: BluetoothSocket? = null
                 try {
                     adapter.cancelDiscovery()
-                    socket = when (strategy) {
+                    val sock: BluetoothSocket = when (strategy) {
                         0 -> device.createRfcommSocketToServiceRecord(spp)
                         1 -> device.createInsecureRfcommSocketToServiceRecord(spp)
                         else -> device.javaClass
                             .getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
                             .invoke(device, 1) as BluetoothSocket
                     }
-                    socket.connect()
-                    val out = socket.outputStream
+                    socket = sock
+                    sock.connect()
+                    val out = sock.outputStream
                     var i = 0
                     while (i < data.size) {
                         val n = minOf(512, data.size - i)
