@@ -61,6 +61,7 @@ class CallActivity : Activity(), TextToSpeech.OnInitListener {
         val t = db.current()
         numberView.text = t?.number?.toString() ?: "-"
         typeView.text = t?.type ?: ""
+        typeView.setTextColor(if (t?.type == Types.URGENT) C.URGENT else C.GREEN)
         waitingView.text = "المنتظرون: ${db.waitingTotal()}"
     }
 

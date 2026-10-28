@@ -204,7 +204,6 @@ class PrinterHelper(private val ctx: Context) {
             for (strategy in 0..2) {
                 var socket: BluetoothSocket? = null
                 try {
-                    adapter.cancelDiscovery()
                     val sock: BluetoothSocket = when (strategy) {
                         0 -> device.createRfcommSocketToServiceRecord(spp)
                         1 -> device.createInsecureRfcommSocketToServiceRecord(spp)
@@ -242,7 +241,7 @@ class PrinterHelper(private val ctx: Context) {
     }
 
     private fun describe(e: Exception): String = when {
-        e is SecurityException -> "إذن البلوتوث غير ممنوح، فعّل إذن الأجهزة القريبة من إعدادات التطبيق"
+        e is SecurityException -> "إذن البلوتوث مرفوض من النظام (${e.message ?: ""})"
         e is IllegalArgumentException -> "عنوان الطابعة غير صحيح، اخترها من جديد من الإعدادات"
         e is IOException && e.cause != null ->
             "فشل الاتصال، تأكد أن الطابعة شغالة ومقترنة وغير متصلة بجهاز آخر (${e.cause?.message ?: ""})"

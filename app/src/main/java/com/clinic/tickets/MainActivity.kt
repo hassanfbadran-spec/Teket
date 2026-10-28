@@ -27,11 +27,15 @@ class MainActivity : Activity() {
         root.addView(title, wrapParams())
         root.addView(status, wrapParams())
 
-        val big = row()
-        val h = dp(100)
-        big.addView(button(Types.EXAM, 30f, C.PRIMARY) { issue(Types.EXAM) }, inRow(1f, h))
-        big.addView(button(Types.REVIEW, 30f, C.GREEN) { issue(Types.REVIEW) }, inRow(1f, h))
-        root.addView(big, wrapParams())
+        val h = dp(90)
+        val r1 = row()
+        r1.addView(button(Types.EXAM, 24f, C.PRIMARY) { issue(Types.EXAM) }, inRow(1f, h))
+        r1.addView(button(Types.URGENT, 24f, C.URGENT) { issue(Types.URGENT) }, inRow(1f, h))
+        root.addView(r1, wrapParams())
+        val r2 = row()
+        r2.addView(button(Types.REVIEW, 24f, C.GREEN) { issue(Types.REVIEW) }, inRow(1f, h))
+        r2.addView(button(Types.CONSULT, 24f, C.TEAL) { issue(Types.CONSULT) }, inRow(1f, h))
+        root.addView(r2, wrapParams())
 
         root.addView(View(this), inColumn(1f))
 

@@ -10,8 +10,11 @@ import java.util.Date
 import java.util.Locale
 
 object Types {
-    const val EXAM = "كشف"
+    const val EXAM = "كشف عادي"
+    const val URGENT = "كشف مستعجل"
     const val REVIEW = "مراجعة"
+    const val CONSULT = "استشارة"
+    const val LEGACY_EXAM = "كشف" // تذاكر قديمة قبل تغيير الاسم، تُحسب كشف عادي
 }
 
 data class Ticket(
@@ -28,7 +31,9 @@ data class Stat(
     val label: String,
     val total: Int,
     val exam: Int,
+    val urgent: Int,
     val review: Int,
+    val consult: Int,
     val skipped: Int,
     val avgWaitMin: Int
 )
@@ -88,14 +93,25 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "tickets.db", null, 1) {
             put("status", "waiting")
         }
         val id = db.insert("tickets", null, v)
-        return Ticket(id, day, n, type, now, null, "waiting") to waitingBefore(day, n)
+        return Ticket(id, day, n, type, now, null, "waiting") to waitingAhead(day, n, type)
     }
 
-    private fun waitingBefore(day: String, number: Int): Int =
-        readableDatabase.rawQuery(
-            "SELECT COUNT(*) FROM tickets WHERE day=? AND status='waiting' AND number<?",
-            arrayOf(day, number.toString())
-        ).use { it.moveToFirst(); it.getInt(0) }
+    /**
+     * المنتظرون قبل هذه التذكرة في ترتيب الاستدعاء:
+     * المستعجل يسبقه المستعجلون الأقدم فقط، وغيره يسبقه كل المستعجلين المنتظرين والأرقام الأقل.
+     */
+    private fun waitingAhead(day: String, number: Int, type: String): Int {
+        val sql: String
+        val args: Array<String>
+        if (type == Types.URGENT) {
+            sql = "SELECT COUNT(*) FROM tickets WHERE day=? AND status='waiting' AND type=? AND number<?"
+            args = arrayOf(day, Types.URGENT, number.toString())
+        } else {
+            sql = "SELECT COUNT(*) FROM tickets WHERE day=? AND status='waiting' AND (type=? OR number<?)"
+            args = arrayOf(day, Types.URGENT, number.toString())
+        }
+        return readableDatabase.rawQuery(sql, args).use { it.moveToFirst(); it.getInt(0) }
+    }
 
     fun waitingTotal(): Int =
         readableDatabase.rawQuery(
@@ -113,15 +129,16 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "tickets.db", null, 1) {
             arrayOf(today())
         ).use { if (it.moveToFirst()) map(it) else null }
 
-    /** ينهي التذكرة الحالية ويستدعي أقل رقم منتظر */
+    /** ينهي التذكرة الحالية ويستدعي المستعجل أولاً، وإلا أقل رقم منتظر (ما سبق استدعاؤه يتخطاه تلقائياً) */
     @Synchronized
     fun callNext(): Ticket? {
         val db = writableDatabase
         val day = today()
         db.execSQL("UPDATE tickets SET status='done' WHERE day=? AND status='called'", arrayOf<Any>(day))
         val next = db.rawQuery(
-            "SELECT $cols FROM tickets WHERE day=? AND status='waiting' ORDER BY number LIMIT 1",
-            arrayOf(day)
+            "SELECT $cols FROM tickets WHERE day=? AND status='waiting' " +
+                "ORDER BY CASE WHEN type=? THEN 0 ELSE 1 END, number LIMIT 1",
+            arrayOf(day, Types.URGENT)
         ).use { if (it.moveToFirst()) map(it) else null } ?: return null
         db.execSQL(
             "UPDATE tickets SET status='called', called_at=? WHERE id=?",
@@ -153,18 +170,21 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "tickets.db", null, 1) {
      */
     fun stats(prefix: String, groupLen: Int): List<Stat> {
         val sql = "SELECT substr(day,1,$groupLen) g, COUNT(*), " +
+            "SUM(CASE WHEN type IN (?,?) THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN type=? THEN 1 ELSE 0 END), " +
             "SUM(CASE WHEN type=? THEN 1 ELSE 0 END), " +
             "SUM(CASE WHEN type=? THEN 1 ELSE 0 END), " +
             "SUM(CASE WHEN status='skipped' THEN 1 ELSE 0 END), " +
             "AVG(CASE WHEN called_at IS NOT NULL THEN called_at-issued_at END) " +
             "FROM tickets WHERE day LIKE ? GROUP BY g ORDER BY g"
+        val args = arrayOf(Types.EXAM, Types.LEGACY_EXAM, Types.URGENT, Types.REVIEW, Types.CONSULT, "$prefix%")
         val out = mutableListOf<Stat>()
-        readableDatabase.rawQuery(sql, arrayOf(Types.EXAM, Types.REVIEW, "$prefix%")).use { c ->
+        readableDatabase.rawQuery(sql, args).use { c ->
             while (c.moveToNext()) {
                 out.add(
                     Stat(
-                        c.getString(0), c.getInt(1), c.getInt(2), c.getInt(3), c.getInt(4),
-                        if (c.isNull(5)) 0 else (c.getDouble(5) / 60000.0).toInt()
+                        c.getString(0), c.getInt(1), c.getInt(2), c.getInt(3), c.getInt(4), c.getInt(5), c.getInt(6),
+                        if (c.isNull(7)) 0 else (c.getDouble(7) / 60000.0).toInt()
                     )
                 )
             }

@@ -110,7 +110,8 @@ class LogActivity : Activity() {
             out.add("لا توجد تذاكر في هذه الفترة")
         } else {
             out.add("الإجمالي: ${total.total}")
-            out.add("كشف: ${total.exam}   |   مراجعة: ${total.review}")
+            out.add("كشف عادي: ${total.exam}   |   مستعجل: ${total.urgent}")
+            out.add("مراجعة: ${total.review}   |   استشارة: ${total.consult}")
             out.add("تخطي: ${total.skipped}")
             out.add("متوسط الانتظار: ${total.avgWaitMin} دقيقة")
             out.add("──────────")
@@ -118,7 +119,7 @@ class LogActivity : Activity() {
                 db.ticketsOfDay(prefix).forEach { out.add(ticketLine(it)) }
             } else {
                 db.stats(prefix, if (mode == 1) 10 else 7).forEach {
-                    out.add("${it.label}:  ${it.total}  (كشف ${it.exam} / مراجعة ${it.review})")
+                    out.add("${it.label}:  ${it.total}  (عادي ${it.exam} / مستعجل ${it.urgent} / مراجعة ${it.review} / استشارة ${it.consult})")
                 }
             }
         }

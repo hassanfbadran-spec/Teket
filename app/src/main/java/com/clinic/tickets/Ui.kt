@@ -18,6 +18,8 @@ object C {
     val MUTED = 0xFF90A4AE.toInt()
     val GRAY = 0xFF607D8B.toInt()
     val INK = 0xFF1B2A38.toInt()
+    val URGENT = 0xFFD84315.toInt()
+    val TEAL = 0xFF00838F.toInt()
 }
 
 fun Context.dp(v: Int): Int = (v * resources.displayMetrics.density).toInt()
