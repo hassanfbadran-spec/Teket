@@ -17,6 +17,11 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!License.isActivated(this)) {
+            startActivity(Intent(this, ActivationActivity::class.java))
+            finish()
+            return
+        }
         db = Db(this)
         printer = PrinterHelper(this)
         printer.connect()
@@ -56,7 +61,7 @@ class MainActivity : Activity() {
     }
 
     override fun onDestroy() {
-        printer.disconnect()
+        if (::printer.isInitialized) printer.disconnect()
         super.onDestroy()
     }
 

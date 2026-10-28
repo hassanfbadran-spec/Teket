@@ -15,7 +15,19 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        create("fixed") {
+            storeFile = file("signing.keystore")
+            storePassword = "clinic123"
+            keyAlias = "clinic"
+            keyPassword = "clinic123"
+        }
+    }
+
     buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("fixed")
+        }
         release {
             isMinifyEnabled = false
         }
