@@ -132,7 +132,7 @@ class LogActivity : Activity() {
             return
         }
         printer.printSummary(Settings.clinic(this), title, lines) { ok ->
-            if (!ok) Toast.makeText(this, "تعذرت الطباعة", Toast.LENGTH_LONG).show()
+            if (!ok) Toast.makeText(this, "تعذرت الطباعة: ${printer.lastError}", Toast.LENGTH_LONG).show()
         }
     }
 }

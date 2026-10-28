@@ -75,7 +75,7 @@ class MainActivity : Activity() {
             Settings.clinic(this), Settings.doctor(this), Settings.footer(this), extras, ticket, ahead
         ) { ok ->
             if (!ok) {
-                Toast.makeText(this, "تعذرت الطباعة للتذكرة رقم ${ticket.number}", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "تعذرت الطباعة للتذكرة رقم ${ticket.number}: ${printer.lastError}", Toast.LENGTH_LONG).show()
             }
             refresh()
         }

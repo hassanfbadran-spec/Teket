@@ -161,7 +161,7 @@ class SettingsActivity : Activity() {
         printer.printTicket(
             Settings.clinic(this), Settings.doctor(this), Settings.footer(this), extras, t, 0
         ) { ok ->
-            if (!ok) Toast.makeText(this, "تعذرت الطباعة", Toast.LENGTH_LONG).show()
+            if (!ok) Toast.makeText(this, "تعذرت الطباعة: ${printer.lastError}", Toast.LENGTH_LONG).show()
         }
     }
 }

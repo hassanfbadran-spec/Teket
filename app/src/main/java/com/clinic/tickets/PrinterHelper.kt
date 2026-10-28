@@ -2,6 +2,7 @@ package com.clinic.tickets
 
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothSocket
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -18,6 +19,7 @@ import com.sunmi.peripheral.printer.InnerPrinterCallback
 import com.sunmi.peripheral.printer.InnerPrinterManager
 import com.sunmi.peripheral.printer.SunmiPrinterService
 import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,6 +35,11 @@ class Block(val text: String, val size: Float, val center: Boolean = true)
 class PrinterHelper(private val ctx: Context) {
 
     private var service: SunmiPrinterService? = null
+
+    /** سبب آخر فشل في الطباعة، لعرضه للمستخدم */
+    var lastError: String = ""
+        private set
+
     private val main = Handler(Looper.getMainLooper())
 
     private val callback = object : InnerPrinterCallback() {
@@ -112,6 +119,7 @@ class PrinterHelper(private val ctx: Context) {
         val bt = usingBluetooth()
         val sunmi = service
         if (!bt && sunmi == null) {
+            lastError = "الطابعة المدمجة غير متصلة"
             onDone(false)
             return
         }
@@ -121,6 +129,7 @@ class PrinterHelper(private val ctx: Context) {
                 val bmp = toBw(render(blocks, dots))
                 if (bt) {
                     sendBluetooth(bmp)
+                    true
                 } else {
                     sunmi!!.printerInit(null)
                     sunmi.setAlignment(1, null)
@@ -129,6 +138,7 @@ class PrinterHelper(private val ctx: Context) {
                     true
                 }
             } catch (e: Exception) {
+                lastError = describe(e)
                 false
             }
             main.post { onDone(ok) }
@@ -177,27 +187,66 @@ class PrinterHelper(private val ctx: Context) {
         return Bitmap.createBitmap(px, w, h, Bitmap.Config.ARGB_8888)
     }
 
+    private val spp: UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
+
+    /**
+     * يجرّب 3 طرق اتصال بالترتيب (عادي، غير مؤمّن، قناة مباشرة)، ويعيد المحاولة مرتين،
+     * ويرسل البيانات على دفعات صغيرة لأن بعض الطابعات تفشل مع الإرسال الكبير.
+     */
     @SuppressLint("MissingPermission")
-    private fun sendBluetooth(bmp: Bitmap): Boolean {
-        val adapter = BluetoothAdapter.getDefaultAdapter() ?: return false
+    private fun sendBluetooth(bmp: Bitmap) {
+        val adapter = BluetoothAdapter.getDefaultAdapter() ?: throw IOException("الجهاز لا يدعم البلوتوث")
+        if (!adapter.isEnabled) throw IOException("البلوتوث مغلق، فعّله وحاول مرة أخرى")
         val device = adapter.getRemoteDevice(Settings.btAddress(ctx))
-        adapter.cancelDiscovery()
-        val socket = device.createRfcommSocketToServiceRecord(
-            UUID.fromString("00001101-0000-1000-8000-00805F9B34FB")
-        )
-        try {
-            socket.connect()
-            val out = socket.outputStream
-            out.write(escposRaster(bmp))
-            out.flush()
-            Thread.sleep(1000)
-            return true
-        } finally {
-            try {
-                socket.close()
-            } catch (e: Exception) {
+        val data = escposRaster(bmp)
+        var last: Exception? = null
+        for (attempt in 0 until 2) {
+            for (strategy in 0..2) {
+                var socket: BluetoothSocket? = null
+                try {
+                    adapter.cancelDiscovery()
+                    socket = when (strategy) {
+                        0 -> device.createRfcommSocketToServiceRecord(spp)
+                        1 -> device.createInsecureRfcommSocketToServiceRecord(spp)
+                        else -> device.javaClass
+                            .getMethod("createRfcommSocket", Int::class.javaPrimitiveType)
+                            .invoke(device, 1) as BluetoothSocket
+                    }
+                    socket.connect()
+                    val out = socket.outputStream
+                    var i = 0
+                    while (i < data.size) {
+                        val n = minOf(512, data.size - i)
+                        out.write(data, i, n)
+                        out.flush()
+                        i += n
+                        Thread.sleep(30)
+                    }
+                    Thread.sleep(1200)
+                    return
+                } catch (e: SecurityException) {
+                    throw e
+                } catch (e: Exception) {
+                    last = e
+                } finally {
+                    try {
+                        socket?.close()
+                    } catch (e: Exception) {
+                    }
+                }
             }
+            Thread.sleep(500)
         }
+        throw IOException("فشل الاتصال بالطابعة بكل الطرق", last)
+    }
+
+    private fun describe(e: Exception): String = when {
+        e is SecurityException -> "إذن البلوتوث غير ممنوح، فعّل إذن الأجهزة القريبة من إعدادات التطبيق"
+        e is IllegalArgumentException -> "عنوان الطابعة غير صحيح، اخترها من جديد من الإعدادات"
+        e is IOException && e.cause != null ->
+            "فشل الاتصال، تأكد أن الطابعة شغالة ومقترنة وغير متصلة بجهاز آخر (${e.cause?.message ?: ""})"
+        e is IOException -> e.message ?: "خطأ في الاتصال"
+        else -> e.message ?: e.javaClass.simpleName
     }
 
     /** أوامر ESC/POS: تهيئة، ثم الصورة على شرائح (GS v 0)، ثم تغذية ورق */
