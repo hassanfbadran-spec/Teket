@@ -53,21 +53,13 @@ class MainActivity : Activity() {
         tools.addView(button("إلغاء تذكرة", 14f, C.GRAY) { cancelDialog() }, inRow())
         root.addView(tools, wrapParams())
 
-        val nav1 = row()
-        nav1.addView(button("الاستدعاء", 18f) { startActivity(Intent(this, CallActivity::class.java)) }, inRow())
-        nav1.addView(button("السجل", 18f) {
-            requirePin { startActivity(Intent(this, LogActivity::class.java)) }
-        }, inRow())
-        root.addView(nav1, wrapParams())
-
-        val nav2 = row()
-        nav2.addView(button("الإعدادات", 18f, C.GRAY) {
+        val nav = row()
+        nav.addView(button("الاستدعاء", 18f) { startActivity(Intent(this, CallActivity::class.java)) }, inRow())
+        nav.addView(button("السجل", 18f) { startActivity(Intent(this, LogActivity::class.java)) }, inRow())
+        nav.addView(button("الإعدادات", 18f, C.GRAY) {
             requirePin { startActivity(Intent(this, SettingsActivity::class.java)) }
         }, inRow())
-        nav2.addView(button("الدعم الفني", 18f, C.GRAY) {
-            startActivity(Intent(this, SupportActivity::class.java))
-        }, inRow())
-        root.addView(nav2, wrapParams())
+        root.addView(nav, wrapParams())
 
         setContentView(root)
     }

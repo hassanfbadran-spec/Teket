@@ -1,30 +1,17 @@
 package com.clinic.tickets
 
 import android.app.Activity
-import android.app.AlertDialog
 import android.content.Intent
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
-import android.view.Gravity
 import android.view.View
-import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.Toast
 
+/** صفحة تواصل معنا: بيانات ثابتة منسقة (تُفتح من داخل الإعدادات) */
 class SupportActivity : Activity() {
-
-    private fun field(hintText: String, value: String) = EditText(this).apply {
-        hint = hintText
-        setText(value)
-        textSize = 18f
-        gravity = Gravity.START
-        layoutDirection = View.LAYOUT_DIRECTION_RTL
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        build()
-    }
 
     private fun version(): String = try {
         packageManager.getPackageInfo(packageName, 0).versionName ?: ""
@@ -40,96 +27,45 @@ class SupportActivity : Activity() {
         }
     }
 
-    private fun build() {
-        val root = column()
-        root.addView(header("الدعم الفني"), wrapParams())
+    /** رقم مصري محلي (01...) إلى صيغة واتساب الدولية */
+    private fun waLink(phone: String) = "https://wa.me/20" + phone.removePrefix("0")
 
-        val name = Settings.support(this, "name")
-        val phone = Settings.support(this, "phone")
-        val wa = Settings.support(this, "whatsapp")
-        val mail = Settings.support(this, "email")
-        val note = Settings.support(this, "note")
-
-        if (listOf(name, phone, wa, mail, note).all { it.isBlank() }) {
-            root.addView(label("لم تُضبط بيانات الدعم الفني بعد.", 16f, false, true), wrapParams())
-        } else {
-            if (name.isNotBlank()) root.addView(label(name, 22f, true, true), wrapParams())
-            if (note.isNotBlank()) root.addView(label(note, 16f, false, true), wrapParams())
-            if (phone.isNotBlank()) {
-                root.addView(button("اتصال: $phone", 18f) {
-                    open(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phone)))
-                }, wrapParams())
-            }
-            if (wa.isNotBlank()) {
-                root.addView(button("واتساب: $wa", 18f, C.GREEN) {
-                    open(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/" + wa.filter { it.isDigit() })))
-                }, wrapParams())
-            }
-            if (mail.isNotBlank()) {
-                root.addView(button("بريد: $mail", 18f, C.GRAY) {
-                    open(Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:" + mail)))
-                }, wrapParams())
-            }
+    private fun section(root: LinearLayout, title: String, person: String, phone: String) {
+        val card = column()
+        card.background = GradientDrawable().apply {
+            setColor(0xFFFFFFFF.toInt())
+            setStroke(dp(1), 0xFFD5E0EA.toInt())
+            cornerRadius = dp(12).toFloat()
         }
+        card.addView(label(title, 18f, true, true).apply { setTextColor(C.PRIMARY) }, wrapParams())
+        card.addView(label(person, 18f, false, true), wrapParams())
+        card.addView(label(phone, 22f, true, true).apply { layoutDirection = View.LAYOUT_DIRECTION_LTR }, wrapParams())
+        val actions = row()
+        actions.addView(button("اتصال", 16f) { open(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + phone))) }, inRow())
+        actions.addView(button("واتساب", 16f, C.GREEN) { open(Intent(Intent.ACTION_VIEW, Uri.parse(waLink(phone)))) }, inRow())
+        card.addView(actions, wrapParams())
+        root.addView(card, wrapParams())
+    }
 
-        root.addView(label("──────────", 14f, false, true), wrapParams())
-        root.addView(label("إصدار البرنامج: " + version(), 14f), wrapParams())
-        val codeView = label("كود الجهاز: " + License.deviceCode(this), 14f)
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        val root = column()
+        root.addView(header("تواصل معنا"), wrapParams())
+        root.addView(label("HULUL SYSTEMS", 28f, true, true).apply { setTextColor(C.DARK) }, wrapParams())
+        root.addView(label("الشركة المنتجة لبرنامج تذاكر العيادة", 14f, false, true), wrapParams())
+
+        section(root, "المبيعات والتسويق", "المهندس أحمد بدران", "01006773332")
+        section(root, "الدعم الفني", "مهندس فتحي بدران", "01016498228")
+
+        root.addView(label("إصدار البرنامج: " + version(), 14f, false, true), wrapParams())
+        val codeView = label("كود الجهاز: " + License.deviceCode(this), 13f, false, true)
         codeView.setTextIsSelectable(true)
         root.addView(codeView, wrapParams())
-
-        if (License.isSupportUnlocked(this)) {
-            root.addView(label("تعديل بيانات الدعم (مفتوح)", 16f, true), wrapParams())
-            val fName = field("الاسم أو الجهة", name)
-            val fPhone = field("رقم الهاتف", phone)
-            val fWa = field("رقم واتساب (بالصيغة الدولية)", wa)
-            val fMail = field("البريد الإلكتروني", mail)
-            val fNote = field("ملاحظة (ساعات العمل مثلاً)", note)
-            for (f in listOf(fName, fPhone, fWa, fMail, fNote)) root.addView(f, wrapParams())
-            root.addView(button("حفظ بيانات الدعم", 18f, C.GREEN) {
-                Settings.saveSupport(
-                    this, fName.text.toString().trim(), fPhone.text.toString().trim(),
-                    fWa.text.toString().trim(), fMail.text.toString().trim(), fNote.text.toString().trim()
-                )
-                Toast.makeText(this, "تم الحفظ", Toast.LENGTH_SHORT).show()
-                build()
-            }, wrapParams())
-            root.addView(button("قفل التعديل", 16f, C.GRAY) {
-                License.lockSupport(this)
-                build()
-            }, wrapParams())
-        } else {
-            root.addView(button("تعديل بيانات الدعم (للمطوّر)", 14f, C.GRAY) { askDevCode() }, wrapParams())
-        }
-
         root.addView(button("رجوع", 18f, C.GRAY) { finish() }, wrapParams())
 
         val scroll = ScrollView(this)
         scroll.setBackgroundColor(C.BG)
         scroll.addView(root)
         setContentView(scroll)
-    }
-
-    private fun askDevCode() {
-        val input = EditText(this).apply {
-            hint = "كود المطوّر"
-            textSize = 14f
-            minLines = 3
-            gravity = Gravity.TOP or Gravity.START
-            layoutDirection = View.LAYOUT_DIRECTION_LTR
-        }
-        AlertDialog.Builder(this)
-            .setTitle("تعديل بيانات الدعم")
-            .setMessage("أدخل كود المطوّر لهذا الجهاز.\nكود الجهاز: " + License.deviceCode(this))
-            .setView(input)
-            .setPositiveButton("فتح") { _, _ ->
-                if (License.unlockSupport(this, input.text.toString())) {
-                    build()
-                } else {
-                    Toast.makeText(this, "الكود غير صحيح لهذا الجهاز", Toast.LENGTH_LONG).show()
-                }
-            }
-            .setNegativeButton("إلغاء", null)
-            .show()
     }
 }

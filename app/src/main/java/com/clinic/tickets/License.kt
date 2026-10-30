@@ -54,24 +54,8 @@ object License {
 
     fun verify(c: Context, input: String): Boolean = verifyMessage(c, input, "")
 
-    /** كود إعادة تعيين رمز الحماية (يُولَّد من المولّد بنوع "إعادة تعيين رمز الحماية") */
+    /** كود إعادة كلمة سر الإعدادات للافتراضية (يُولَّد من المولّد بنوع "إعادة تعيين كلمة السر") */
     fun verifyPinReset(c: Context, input: String): Boolean = verifyMessage(c, input, "PIN:")
-
-    /** فتح تعديل بيانات الدعم الفني (يُولَّد من المولّد بنوع "فتح تعديل الدعم الفني") */
-    fun isSupportUnlocked(c: Context): Boolean {
-        val saved = prefs(c).getString("support", null) ?: return false
-        return verifyMessage(c, saved, "SUP:")
-    }
-
-    fun unlockSupport(c: Context, input: String): Boolean {
-        if (!verifyMessage(c, input, "SUP:")) return false
-        prefs(c).edit().putString("support", input.trim()).apply()
-        return true
-    }
-
-    fun lockSupport(c: Context) {
-        prefs(c).edit().remove("support").apply()
-    }
 
     fun activate(c: Context, input: String): Boolean {
         if (!verify(c, input)) return false

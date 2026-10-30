@@ -99,29 +99,25 @@ fun Context.wrapParams() =
     LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         .apply { setMargins(0, dp(4), 0, dp(4)) }
 
-/** يطلب رمز الحماية قبل تنفيذ الإجراء، وإن لم يكن هناك رمز ينفّذه مباشرة */
+/** يطلب كلمة سر الإعدادات قبل تنفيذ الإجراء */
 fun Activity.requirePin(onOk: () -> Unit) {
-    if (!Settings.hasPin(this)) {
-        onOk()
-        return
-    }
     val input = EditText(this).apply {
-        inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
-        hint = "الرمز"
+        inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        hint = "كلمة السر"
         gravity = Gravity.CENTER
         textSize = 22f
     }
     AlertDialog.Builder(this)
-        .setTitle("أدخل رمز الحماية")
+        .setTitle("أدخل كلمة السر")
         .setView(input)
         .setPositiveButton("دخول") { _, _ ->
             if (Settings.checkPin(this, input.text.toString())) {
                 onOk()
             } else {
-                Toast.makeText(this, "الرمز غير صحيح", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "كلمة السر غير صحيحة", Toast.LENGTH_SHORT).show()
             }
         }
-        .setNeutralButton("نسيت الرمز") { _, _ -> forgotPin() }
+        .setNeutralButton("نسيت كلمة السر") { _, _ -> forgotPin() }
         .setNegativeButton("إلغاء", null)
         .show()
 }
@@ -135,13 +131,13 @@ private fun Activity.forgotPin() {
         layoutDirection = View.LAYOUT_DIRECTION_LTR
     }
     AlertDialog.Builder(this)
-        .setTitle("نسيت الرمز")
+        .setTitle("نسيت كلمة السر")
         .setMessage("أرسل كود الجهاز لمزوّد البرنامج لتحصل على كود إعادة التعيين:\n" + License.deviceCode(this))
         .setView(input)
         .setPositiveButton("تأكيد") { _, _ ->
             if (License.verifyPinReset(this, input.text.toString())) {
                 Settings.clearPin(this)
-                Toast.makeText(this, "تم إلغاء رمز الحماية", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, "تمت إعادة كلمة السر إلى admin", Toast.LENGTH_LONG).show()
             } else {
                 Toast.makeText(this, "الكود غير صحيح لهذا الجهاز", Toast.LENGTH_LONG).show()
             }

@@ -82,16 +82,16 @@ class SettingsActivity : Activity() {
         root.addView(button("حفظ", 20f, C.GREEN) { save(true) }, wrapParams())
         root.addView(button("طباعة تذكرة تجريبية", 18f) { testPrint() }, wrapParams())
 
-        root.addView(label("رمز الحماية", 16f, true), wrapParams())
-        root.addView(label("يحمي دخول الإعدادات والسجل. الرمز من 4 إلى 8 أرقام.", 13f), wrapParams())
-        pinField = field("رمز جديد", "").apply {
-            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        root.addView(label("كلمة سر الإعدادات", 16f, true), wrapParams())
+        root.addView(label("الافتراضية admin. يمكنك تغييرها هنا (4 أحرف على الأقل).", 13f), wrapParams())
+        pinField = field("كلمة سر جديدة", "").apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
         }
         root.addView(pinField, wrapParams())
-        root.addView(button("حفظ الرمز", 16f) { savePin() }, wrapParams())
-        root.addView(button("إزالة الرمز", 16f, C.GRAY) {
+        root.addView(button("حفظ كلمة السر", 16f) { savePin() }, wrapParams())
+        root.addView(button("إرجاع كلمة السر إلى admin", 16f, C.GRAY) {
             Settings.clearPin(this)
-            Toast.makeText(this, "تم إلغاء رمز الحماية", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "تمت إعادة كلمة السر إلى admin", Toast.LENGTH_SHORT).show()
         }, wrapParams())
 
         root.addView(label("النسخ الاحتياطي", 16f, true), wrapParams())
@@ -99,6 +99,9 @@ class SettingsActivity : Activity() {
         root.addView(button("تصدير نسخة احتياطية", 16f) { exportBackup() }, wrapParams())
         root.addView(button("استرجاع نسخة احتياطية", 16f, C.GRAY) { importBackup() }, wrapParams())
 
+        root.addView(button("تواصل معنا / الدعم الفني", 18f, C.GREEN) {
+            startActivity(Intent(this, SupportActivity::class.java))
+        }, wrapParams())
         root.addView(button("رجوع", 18f, C.GRAY) { finish() }, wrapParams())
 
         refreshPrinterInfo()
@@ -194,13 +197,13 @@ class SettingsActivity : Activity() {
 
     private fun savePin() {
         val pin = pinField.text.toString().trim()
-        if (!Regex("^[0-9]{4,8}$").matches(pin)) {
-            Toast.makeText(this, "الرمز يجب أن يكون من 4 إلى 8 أرقام", Toast.LENGTH_LONG).show()
+        if (pin.length < 4) {
+            Toast.makeText(this, "كلمة السر يجب ألا تقل عن 4 أحرف", Toast.LENGTH_LONG).show()
             return
         }
         Settings.setPin(this, pin)
         pinField.setText("")
-        Toast.makeText(this, "تم حفظ رمز الحماية", Toast.LENGTH_SHORT).show()
+        Toast.makeText(this, "تم حفظ كلمة السر", Toast.LENGTH_SHORT).show()
     }
 
     // ---------- النسخ الاحتياطي ----------
