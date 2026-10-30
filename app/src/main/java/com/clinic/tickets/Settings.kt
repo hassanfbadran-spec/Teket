@@ -37,4 +37,43 @@ object Settings {
     fun savePaper(c: Context, dots: Int) {
         p(c).edit().putInt("paper", dots).apply()
     }
+
+    // ---------- رمز الحماية ----------
+    private fun sha(text: String): String =
+        java.security.MessageDigest.getInstance("SHA-256").digest(text.toByteArray())
+            .joinToString("") { "%02x".format(it) }
+
+    fun hasPin(c: Context): Boolean = (p(c).getString("pin", "") ?: "").isNotEmpty()
+    fun setPin(c: Context, pin: String) {
+        p(c).edit().putString("pin", sha("clinic-pin:" + pin)).apply()
+    }
+    fun clearPin(c: Context) {
+        p(c).edit().remove("pin").apply()
+    }
+    fun checkPin(c: Context, pin: String): Boolean = sha("clinic-pin:" + pin) == (p(c).getString("pin", "") ?: "")
+
+    // ---------- بيانات الدعم الفني ----------
+    fun support(c: Context, key: String): String = p(c).getString("sup_" + key, SupportDefaults.get(key)) ?: ""
+
+    fun saveSupport(c: Context, name: String, phone: String, whatsapp: String, email: String, note: String) {
+        p(c).edit()
+            .putString("sup_name", name)
+            .putString("sup_phone", phone)
+            .putString("sup_whatsapp", whatsapp)
+            .putString("sup_email", email)
+            .putString("sup_note", note)
+            .apply()
+    }
+}
+
+/** القيم الافتراضية لبيانات الدعم الفني (تُملأ عند البناء، ويمكن تعديلها من داخل البرنامج) */
+object SupportDefaults {
+    fun get(key: String): String = when (key) {
+        "name" -> ""
+        "phone" -> ""
+        "whatsapp" -> ""
+        "email" -> ""
+        "note" -> ""
+        else -> ""
+    }
 }

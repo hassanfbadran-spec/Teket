@@ -35,6 +35,7 @@ data class Stat(
     val review: Int,
     val consult: Int,
     val skipped: Int,
+    val cancelled: Int,
     val avgWaitMin: Int
 )
 
@@ -43,6 +44,7 @@ fun statusAr(s: String) = when (s) {
     "called" -> "جاري"
     "done" -> "تم"
     "skipped" -> "تخطي"
+    "cancelled" -> "ملغاة"
     else -> s
 }
 
@@ -164,17 +166,76 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "tickets.db", null, 1) {
         return out
     }
 
+    fun aheadOf(t: Ticket): Int = waitingAhead(t.day, t.number, t.type)
+
+    /** آخر تذكرة صدرت اليوم وغير ملغاة */
+    fun lastIssued(): Ticket? =
+        readableDatabase.rawQuery(
+            "SELECT $cols FROM tickets WHERE day=? AND status<>'cancelled' ORDER BY id DESC LIMIT 1",
+            arrayOf(today())
+        ).use { if (it.moveToFirst()) map(it) else null }
+
+    /** يلغي تذكرة منتظرة بالرقم، أو آخر تذكرة لو الرقم null. يرجع رسالة للعرض */
+    @Synchronized
+    fun cancel(number: Int?): String {
+        val db = writableDatabase
+        val t = if (number == null) {
+            lastIssued()
+        } else {
+            db.rawQuery(
+                "SELECT $cols FROM tickets WHERE day=? AND number=?", arrayOf(today(), number.toString())
+            ).use { if (it.moveToFirst()) map(it) else null }
+        }
+        if (t == null) return "لا توجد تذكرة بهذا الرقم اليوم"
+        if (t.status == "cancelled") return "التذكرة رقم ${t.number} ملغاة بالفعل"
+        if (t.status != "waiting") return "لا يمكن إلغاء التذكرة رقم ${t.number} لأنها استُدعيت"
+        db.execSQL("UPDATE tickets SET status='cancelled' WHERE id=?", arrayOf<Any>(t.id))
+        return "تم إلغاء التذكرة رقم ${t.number}"
+    }
+
+    fun allTickets(): List<Ticket> {
+        val out = mutableListOf<Ticket>()
+        readableDatabase.rawQuery("SELECT $cols FROM tickets ORDER BY id", null)
+            .use { while (it.moveToNext()) out.add(map(it)) }
+        return out
+    }
+
+    /** استبدال كل التذاكر (للاسترجاع من نسخة احتياطية) */
+    @Synchronized
+    fun replaceAll(list: List<Ticket>) {
+        val db = writableDatabase
+        db.beginTransaction()
+        try {
+            db.execSQL("DELETE FROM tickets")
+            for (t in list) {
+                val v = ContentValues()
+                v.put("day", t.day)
+                v.put("number", t.number)
+                v.put("type", t.type)
+                v.put("issued_at", t.issuedAt)
+                if (t.calledAt != null) v.put("called_at", t.calledAt) else v.putNull("called_at")
+                v.put("status", t.status)
+                db.insert("tickets", null, v)
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     /**
      * إحصائيات لفترة تبدأ بـ prefix (yyyy أو yyyy-MM أو yyyy-MM-dd).
      * groupLen = 0 يرجع صفاً واحداً للإجمالي، 10 تجميع بالأيام، 7 تجميع بالشهور.
      */
     fun stats(prefix: String, groupLen: Int): List<Stat> {
-        val sql = "SELECT substr(day,1,$groupLen) g, COUNT(*), " +
-            "SUM(CASE WHEN type IN (?,?) THEN 1 ELSE 0 END), " +
-            "SUM(CASE WHEN type=? THEN 1 ELSE 0 END), " +
-            "SUM(CASE WHEN type=? THEN 1 ELSE 0 END), " +
-            "SUM(CASE WHEN type=? THEN 1 ELSE 0 END), " +
+        val sql = "SELECT substr(day,1,$groupLen) g, " +
+            "SUM(CASE WHEN status<>'cancelled' THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN status<>'cancelled' AND type IN (?,?) THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN status<>'cancelled' AND type=? THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN status<>'cancelled' AND type=? THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN status<>'cancelled' AND type=? THEN 1 ELSE 0 END), " +
             "SUM(CASE WHEN status='skipped' THEN 1 ELSE 0 END), " +
+            "SUM(CASE WHEN status='cancelled' THEN 1 ELSE 0 END), " +
             "AVG(CASE WHEN called_at IS NOT NULL THEN called_at-issued_at END) " +
             "FROM tickets WHERE day LIKE ? GROUP BY g ORDER BY g"
         val args = arrayOf(Types.EXAM, Types.LEGACY_EXAM, Types.URGENT, Types.REVIEW, Types.CONSULT, "$prefix%")
@@ -183,8 +244,9 @@ class Db(ctx: Context) : SQLiteOpenHelper(ctx, "tickets.db", null, 1) {
             while (c.moveToNext()) {
                 out.add(
                     Stat(
-                        c.getString(0), c.getInt(1), c.getInt(2), c.getInt(3), c.getInt(4), c.getInt(5), c.getInt(6),
-                        if (c.isNull(7)) 0 else (c.getDouble(7) / 60000.0).toInt()
+                        c.getString(0), c.getInt(1), c.getInt(2), c.getInt(3), c.getInt(4), c.getInt(5),
+                        c.getInt(6), c.getInt(7),
+                        if (c.isNull(8)) 0 else (c.getDouble(8) / 60000.0).toInt()
                     )
                 )
             }

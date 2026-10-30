@@ -5,9 +5,12 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.AlertDialog
 import android.bluetooth.BluetoothAdapter
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
@@ -15,9 +18,13 @@ import android.widget.EditText
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class SettingsActivity : Activity() {
 
+    private lateinit var db: Db
     private lateinit var printer: PrinterHelper
     private lateinit var clinic: EditText
     private lateinit var doctor: EditText
@@ -25,6 +32,7 @@ class SettingsActivity : Activity() {
     private lateinit var line1: EditText
     private lateinit var line2: EditText
     private lateinit var line3: EditText
+    private lateinit var pinField: EditText
     private lateinit var printerLabel: TextView
     private lateinit var paperBtn: Button
 
@@ -38,6 +46,7 @@ class SettingsActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        db = Db(this)
         printer = PrinterHelper(this)
         printer.connect()
 
@@ -72,6 +81,24 @@ class SettingsActivity : Activity() {
 
         root.addView(button("حفظ", 20f, C.GREEN) { save(true) }, wrapParams())
         root.addView(button("طباعة تذكرة تجريبية", 18f) { testPrint() }, wrapParams())
+
+        root.addView(label("رمز الحماية", 16f, true), wrapParams())
+        root.addView(label("يحمي دخول الإعدادات والسجل. الرمز من 4 إلى 8 أرقام.", 13f), wrapParams())
+        pinField = field("رمز جديد", "").apply {
+            inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        }
+        root.addView(pinField, wrapParams())
+        root.addView(button("حفظ الرمز", 16f) { savePin() }, wrapParams())
+        root.addView(button("إزالة الرمز", 16f, C.GRAY) {
+            Settings.clearPin(this)
+            Toast.makeText(this, "تم إلغاء رمز الحماية", Toast.LENGTH_SHORT).show()
+        }, wrapParams())
+
+        root.addView(label("النسخ الاحتياطي", 16f, true), wrapParams())
+        root.addView(label("يحفظ سجل التذاكر والإعدادات في ملف تختار مكانه (لا يشمل التفعيل ولا الطابعة).", 13f), wrapParams())
+        root.addView(button("تصدير نسخة احتياطية", 16f) { exportBackup() }, wrapParams())
+        root.addView(button("استرجاع نسخة احتياطية", 16f, C.GRAY) { importBackup() }, wrapParams())
+
         root.addView(button("رجوع", 18f, C.GRAY) { finish() }, wrapParams())
 
         refreshPrinterInfo()
@@ -82,7 +109,7 @@ class SettingsActivity : Activity() {
     }
 
     override fun onDestroy() {
-        printer.disconnect()
+        if (::printer.isInitialized) printer.disconnect()
         super.onDestroy()
     }
 
@@ -162,6 +189,71 @@ class SettingsActivity : Activity() {
             Settings.clinic(this), Settings.doctor(this), Settings.footer(this), extras, t, 0
         ) { ok ->
             if (!ok) Toast.makeText(this, "تعذرت الطباعة: ${printer.lastError}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun savePin() {
+        val pin = pinField.text.toString().trim()
+        if (!Regex("^[0-9]{4,8}$").matches(pin)) {
+            Toast.makeText(this, "الرمز يجب أن يكون من 4 إلى 8 أرقام", Toast.LENGTH_LONG).show()
+            return
+        }
+        Settings.setPin(this, pin)
+        pinField.setText("")
+        Toast.makeText(this, "تم حفظ رمز الحماية", Toast.LENGTH_SHORT).show()
+    }
+
+    // ---------- النسخ الاحتياطي ----------
+    private fun exportBackup() {
+        val name = "clinic-tickets-backup-" + SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date()) + ".json"
+        val i = Intent(Intent.ACTION_CREATE_DOCUMENT)
+        i.addCategory(Intent.CATEGORY_OPENABLE)
+        i.type = "application/json"
+        i.putExtra(Intent.EXTRA_TITLE, name)
+        startActivityForResult(i, 101)
+    }
+
+    private fun importBackup() {
+        val i = Intent(Intent.ACTION_OPEN_DOCUMENT)
+        i.addCategory(Intent.CATEGORY_OPENABLE)
+        i.type = "*/*"
+        startActivityForResult(i, 102)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        val uri = data?.data
+        if (resultCode != RESULT_OK || uri == null) return
+        when (requestCode) {
+            101 -> writeBackup(uri)
+            102 -> AlertDialog.Builder(this)
+                .setTitle("استرجاع نسخة احتياطية")
+                .setMessage("سيتم استبدال سجل التذاكر الحالي والإعدادات بمحتوى النسخة. هل تريد المتابعة؟")
+                .setPositiveButton("استرجاع") { _, _ -> readBackup(uri) }
+                .setNegativeButton("إلغاء", null)
+                .show()
+        }
+    }
+
+    private fun writeBackup(uri: Uri) {
+        try {
+            val text = Backup.build(this, db)
+            contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+            Toast.makeText(this, "تم تصدير النسخة الاحتياطية", Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "تعذر التصدير: ${e.message}", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun readBackup(uri: Uri) {
+        try {
+            val text = contentResolver.openInputStream(uri)?.use { String(it.readBytes(), Charsets.UTF_8) }
+                ?: throw IllegalStateException("تعذرت قراءة الملف")
+            val n = Backup.restore(this, db, text)
+            Toast.makeText(this, "تم استرجاع $n تذكرة", Toast.LENGTH_LONG).show()
+            recreate()
+        } catch (e: Exception) {
+            Toast.makeText(this, "تعذر الاسترجاع: ${e.message}", Toast.LENGTH_LONG).show()
         }
     }
 }

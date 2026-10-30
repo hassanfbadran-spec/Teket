@@ -98,7 +98,7 @@ class PrinterHelper(private val ctx: Context) {
         blocks.add(Block("──────────────", 26f))
         blocks.add(Block(t.type, 38f))
         blocks.add(Block(t.number.toString(), 130f))
-        blocks.add(Block("عدد المنتظرين قبلك: $ahead", 28f))
+        if (ahead >= 0) blocks.add(Block("عدد المنتظرين قبلك: $ahead", 28f))
         blocks.add(Block(whenText, 24f))
         if (footer.isNotBlank()) blocks.add(Block(footer, 24f))
         extras.filter { it.isNotBlank() }.forEach { blocks.add(Block(it, 24f)) }

@@ -112,7 +112,7 @@ class LogActivity : Activity() {
             out.add("الإجمالي: ${total.total}")
             out.add("كشف عادي: ${total.exam}   |   مستعجل: ${total.urgent}")
             out.add("مراجعة: ${total.review}   |   استشارة: ${total.consult}")
-            out.add("تخطي: ${total.skipped}")
+            out.add("تخطي: ${total.skipped}   |   ملغاة: ${total.cancelled}")
             out.add("متوسط الانتظار: ${total.avgWaitMin} دقيقة")
             out.add("──────────")
             if (mode == 0) {

@@ -36,7 +36,7 @@ object License {
         return byteArrayOf(0x30, body.size.toByte()) + body
     }
 
-    fun verify(c: Context, input: String): Boolean {
+    private fun verifyMessage(c: Context, input: String, prefix: String): Boolean {
         return try {
             val hex = input.filter { it in '0'..'9' || it in 'a'..'f' || it in 'A'..'F' }
             if (hex.length != 128) return false
@@ -45,11 +45,32 @@ object License {
                 .generatePublic(X509EncodedKeySpec(Base64.decode(PUBLIC_KEY, Base64.NO_WRAP)))
             val sig = Signature.getInstance("SHA256withECDSA")
             sig.initVerify(pub)
-            sig.update(deviceCode(c).replace("-", "").toByteArray())
+            sig.update((prefix + deviceCode(c).replace("-", "")).toByteArray())
             sig.verify(derEncode(raw))
         } catch (e: Exception) {
             false
         }
+    }
+
+    fun verify(c: Context, input: String): Boolean = verifyMessage(c, input, "")
+
+    /** كود إعادة تعيين رمز الحماية (يُولَّد من المولّد بنوع "إعادة تعيين رمز الحماية") */
+    fun verifyPinReset(c: Context, input: String): Boolean = verifyMessage(c, input, "PIN:")
+
+    /** فتح تعديل بيانات الدعم الفني (يُولَّد من المولّد بنوع "فتح تعديل الدعم الفني") */
+    fun isSupportUnlocked(c: Context): Boolean {
+        val saved = prefs(c).getString("support", null) ?: return false
+        return verifyMessage(c, saved, "SUP:")
+    }
+
+    fun unlockSupport(c: Context, input: String): Boolean {
+        if (!verifyMessage(c, input, "SUP:")) return false
+        prefs(c).edit().putString("support", input.trim()).apply()
+        return true
+    }
+
+    fun lockSupport(c: Context) {
+        prefs(c).edit().remove("support").apply()
     }
 
     fun activate(c: Context, input: String): Boolean {

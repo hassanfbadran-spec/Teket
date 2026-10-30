@@ -1,6 +1,11 @@
 package com.clinic.tickets
 
+import android.app.Activity
+import android.app.AlertDialog
 import android.content.Context
+import android.text.InputType
+import android.widget.EditText
+import android.widget.Toast
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -93,3 +98,54 @@ fun Context.inColumn(w: Float = 1f) =
 fun Context.wrapParams() =
     LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         .apply { setMargins(0, dp(4), 0, dp(4)) }
+
+/** يطلب رمز الحماية قبل تنفيذ الإجراء، وإن لم يكن هناك رمز ينفّذه مباشرة */
+fun Activity.requirePin(onOk: () -> Unit) {
+    if (!Settings.hasPin(this)) {
+        onOk()
+        return
+    }
+    val input = EditText(this).apply {
+        inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_VARIATION_PASSWORD
+        hint = "الرمز"
+        gravity = Gravity.CENTER
+        textSize = 22f
+    }
+    AlertDialog.Builder(this)
+        .setTitle("أدخل رمز الحماية")
+        .setView(input)
+        .setPositiveButton("دخول") { _, _ ->
+            if (Settings.checkPin(this, input.text.toString())) {
+                onOk()
+            } else {
+                Toast.makeText(this, "الرمز غير صحيح", Toast.LENGTH_SHORT).show()
+            }
+        }
+        .setNeutralButton("نسيت الرمز") { _, _ -> forgotPin() }
+        .setNegativeButton("إلغاء", null)
+        .show()
+}
+
+private fun Activity.forgotPin() {
+    val input = EditText(this).apply {
+        hint = "كود إعادة التعيين"
+        textSize = 14f
+        minLines = 3
+        gravity = Gravity.TOP or Gravity.START
+        layoutDirection = View.LAYOUT_DIRECTION_LTR
+    }
+    AlertDialog.Builder(this)
+        .setTitle("نسيت الرمز")
+        .setMessage("أرسل كود الجهاز لمزوّد البرنامج لتحصل على كود إعادة التعيين:\n" + License.deviceCode(this))
+        .setView(input)
+        .setPositiveButton("تأكيد") { _, _ ->
+            if (License.verifyPinReset(this, input.text.toString())) {
+                Settings.clearPin(this)
+                Toast.makeText(this, "تم إلغاء رمز الحماية", Toast.LENGTH_LONG).show()
+            } else {
+                Toast.makeText(this, "الكود غير صحيح لهذا الجهاز", Toast.LENGTH_LONG).show()
+            }
+        }
+        .setNegativeButton("إلغاء", null)
+        .show()
+}
